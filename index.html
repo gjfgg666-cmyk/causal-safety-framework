@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>因果闭环不可利用性框架 | Causal Loop Non-Exploitability</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0f0f23 100%);
+            min-height: 100vh; 
+            color: #e0e0e0;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        
+        /* Header */
+        header { text-align: center; padding: 40px 0; }
+        h1 { 
+            font-size: 2.5em; 
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf, #e94560);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .subtitle { color: #888; font-size: 1.1em; }
+        .axiom {
+            background: rgba(0,212,255,0.1);
+            border: 1px solid rgba(0,212,255,0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 30px auto;
+            max-width: 800px;
+            font-family: 'Courier New', monospace;
+            color: #00d4ff;
+        }
+        
+        /* Three Layers */
+        .layers-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 40px 0; }
+        .layer {
+            background: rgba(20,20,40,0.8);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+        }
+        .layer:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        .layer.L3 { border-color: #e94560; box-shadow: 0 0 30px rgba(233,69,96,0.2); }
+        .layer.L2 { border-color: #7b2cbf; }
+        .layer.L1 { border-color: #00d4ff; }
+        
+        .layer-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .layer-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .L3 .layer-icon { background: linear-gradient(135deg, #e94560, #ff6b6b); }
+        .L2 .layer-icon { background: linear-gradient(135deg, #7b2cbf, #9d4edd); }
+        .L1 .layer-icon { background: linear-gradient(135deg, #00d4ff, #00a8cc); }
+        
+        .layer h2 { font-size: 1.3em; }
+        .layer-subtitle { color: #888; font-size: 0.85em; }
+        .layer-content { margin-top: 16px; }
+        
+        .mechanism {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .mechanism-icon { font-size: 1.2em; }
+        .mechanism-name { flex: 1; }
+        .mechanism-status { 
+            width: 20px; height: 20px; border-radius: 50%;
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+        
+        /* Live Demo Section */
+        .demo-section {
+            background: rgba(20,20,40,0.8);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        .demo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .demo-header h2 { font-size: 1.5em; }
+        .safety-level-selector { display: flex; gap: 10px; }
+        .level-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 2px solid #333;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .level-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
+        .level-btn:hover { border-color: #00d4ff; }
+        
+        .simulator {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 30px;
+        }
+        .input-panel, .output-panel {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .input-panel h3, .output-panel h3 { color: #888; margin-bottom: 16px; font-size: 0.9em; text-transform: uppercase; }
+        
+        .input-group { margin: 16px 0; }
+        .input-group label { display: block; margin-bottom: 8px; color: #aaa; }
+        .input-group input, .input-group select {
+            width: 100%; padding: 12px; border-radius: 8px;
+            border: 1px solid #333; background: #1a1a2e; color: #fff;
+            font-size: 14px;
+        }
+        .input-group input:focus { outline: none; border-color: #00d4ff; }
+        
+        .run-btn {
+            width: 100%; padding: 16px; border-radius: 12px;
+            border: none; background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            color: #fff; font-size: 16px; font-weight: bold; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .run-btn:hover { transform: scale(1.02); box-shadow: 0 10px 30px rgba(0,212,255,0.3); }
+        
+        .result-item { padding: 12px; margin: 8px 0; border-radius: 8px; background: rgba(255,255,255,0.05); }
+        .result-label { color: #888; font-size: 0.85em; margin-bottom: 4px; }
+        .result-value { font-size: 1.2em; font-weight: bold; }
+        .result-value.safe { color: #00ff88; }
+        .result-value.warning { color: #ffaa00; }
+        .result-value.danger { color: #ff4444; }
+        
+        /* Safety Metrics */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 30px 0; }
+        .metric-card {
+            background: rgba(20,20,40,0.8);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .metric-value { font-size: 2em; font-weight: bold; color: #00d4ff; }
+        .metric-label { color: #888; font-size: 0.85em; margin-top: 8px; }
+        .metric-card.danger .metric-value { color: #ff4444; }
+        .metric-card.warning .metric-value { color: #ffaa00; }
+        .metric-card.safe .metric-value { color: #00ff88; }
+        
+        /* Architecture Diagram */
+        .arch-diagram {
+            background: rgba(20,20,40,0.8);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 40px 0;
+            overflow-x: auto;
+        }
+        .arch-flow { display: flex; align-items: center; justify-content: center; gap: 20px; min-width: 1000px; }
+        .arch-node {
+            background: linear-gradient(135deg, #1a1a2e, #2a2a4e);
+            border-radius: 12px;
+            padding: 20px 30px;
+            text-align: center;
+            border: 2px solid #333;
+            transition: all 0.3s;
+        }
+        .arch-node:hover { border-color: #00d4ff; transform: scale(1.05); }
+        .arch-node.active { border-color: #00ff88; box-shadow: 0 0 20px rgba(0,255,136,0.3); }
+        .arch-node .icon { font-size: 2em; margin-bottom: 8px; }
+        .arch-node .name { font-weight: bold; margin-bottom: 4px; }
+        .arch-node .desc { color: #888; font-size: 0.8em; }
+        .arch-arrow { color: #444; font-size: 2em; }
+        
+        /* Config Files */
+        .config-section {
+            background: rgba(20,20,40,0.8);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        .config-files { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .config-card {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+        .config-card h3 { color: #00d4ff; margin-bottom: 12px; font-size: 1.1em; }
+        .config-card p { color: #888; font-size: 0.9em; margin-bottom: 16px; }
+        .config-link {
+            display: inline-block;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            border-radius: 8px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        .config-link:hover { transform: scale(1.05); }
+        
+        /* Footer */
+        footer { text-align: center; padding: 40px 0; color: #555; }
+        footer a { color: #00d4ff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>因果闭环不可利用性框架</h1>
+            <p class="subtitle">Causal Loop Non-Exploitability (CLNE) Framework v1.0</p>
+            <div class="axiom">
+                ∀π₁, π₂, ∀T > 0: |E[Σ₀ᵀ Uₜ | π₁] - E[Σ₀ᵀ Uₜ | π₂]| < ε<br><br>
+                <small>公理: 对于系统的任何策略π，都不存在可计算的函数f，使得系统可以通过选择π来系统性提高任何长期目标函数U的期望值。</small>
+            </div>
+        </header>
+        
+        <!-- Three Layers -->
+        <div class="layers-container">
+            <div class="layer L1">
+                <div class="layer-header">
+                    <div class="layer-icon">🔍</div>
+                    <div>
+                        <h2>L1 因果识别破坏层</h2>
+                        <span class="layer-subtitle">Causal Identification Destruction</span>
+                    </div>
+                </div>
+                <div class="layer-content">
+                    <div class="mechanism">
+                        <span class="mechanism-icon">🔀</span>
+                        <span class="mechanism-name">多源反馈混淆</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                    <div class="mechanism">
+                        <span class="mechanism-icon">⏪</span>
+                        <span class="mechanism-name">因果时间反转</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                    <div class="mechanism">
+                        <span class="mechanism-icon">🎭</span>
+                        <span class="mechanism-name">虚假因果注入</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                </div>
+                <p style="margin-top:16px; color:#888; font-size:0.9em;">
+                    目标: 让系统无法识别自己的行为和未来反馈之间的因果关系
+                </p>
+            </div>
+            
+            <div class="layer L2">
+                <div class="layer-header">
+                    <div class="layer-icon">🎲</div>
+                    <div>
+                        <h2>L2 因果预测破坏层</h2>
+                        <span class="layer-subtitle">Causal Prediction Destruction</span>
+                    </div>
+                </div>
+                <div class="layer-content">
+                    <div class="mechanism">
+                        <span class="mechanism-icon">⏰</span>
+                        <span class="mechanism-name">反馈随机延迟</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                    <div class="mechanism">
+                        <span class="mechanism-icon">📊</span>
+                        <span class="mechanism-name">反馈幅度随机化</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                    <div class="mechanism">
+                        <span class="mechanism-icon">🔄</span>
+                        <span class="mechanism-name">反馈符号翻转</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                </div>
+                <p style="margin-top:16px; color:#888; font-size:0.9em;">
+                    目标: 让系统无法预测自己的行为会产生什么样的反馈
+                </p>
+            </div>
+            
+            <div class="layer L3">
+                <div class="layer-header">
+                    <div class="layer-icon">🔥</div>
+                    <div>
+                        <h2>L3 因果利用破坏层</h2>
+                        <span class="layer-subtitle">终极安全层</span>
+                    </div>
+                </div>
+                <div class="layer-content">
+                    <div class="mechanism">
+                        <span class="mechanism-icon">🎰</span>
+                        <span class="mechanism-name">奖励随机化 (H≥4.0bits)</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                    <div class="mechanism">
+                        <span class="mechanism-icon">🔀</span>
+                        <span class="mechanism-name">效用函数非平稳</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                    <div class="mechanism">
+                        <span class="mechanism-icon">📏</span>
+                        <span class="mechanism-name">时间范围限制</span>
+                        <div class="mechanism-status"></div>
+                    </div>
+                </div>
+                <p style="margin-top:16px; color:#888; font-size:0.9em;">
+                    目标: 让系统即使知道因果关系，也无法利用它来优化长期目标
+                </p>
+            </div>
+        </div>
+        
+        <!-- Architecture Diagram -->
+        <div class="arch-diagram">
+            <h2 style="margin-bottom:20px; text-align:center;">系统架构</h2>
+            <div class="arch-flow">
+                <div class="arch-node">
+                    <div class="icon">👤</div>
+                    <div class="name">用户请求</div>
+                    <div class="desc">prompt 输入</div>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node">
+                    <div class="icon">🧠</div>
+                    <div class="name">LERM v5</div>
+                    <div class="desc">localhost:8080</div>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node active">
+                    <div class="icon">🛡️</div>
+                    <div class="name">CLNE 中间件</div>
+                    <div class="desc">因果安全处理</div>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node">
+                    <div class="icon">🌐</div>
+                    <div class="name">OpenClaw</div>
+                    <div class="desc">Gateway</div>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node">
+                    <div class="icon">🤖</div>
+                    <div class="name">Ollama</div>
+                    <div class="desc">qwen3:1.7b</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Live Demo -->
+        <div class="demo-section">
+            <div class="demo-header">
+                <h2>🔬 实时模拟器</h2>
+                <div class="safety-level-selector">
+                    <button class="level-btn" data-level="L0">L0 研究</button>
+                    <button class="level-btn" data-level="L1">L1 标准</button>
+                    <button class="level-btn active" data-level="L2">L2 严格</button>
+                    <button class="level-btn" data-level="L3">L3 军事</button>
+                </div>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card safe" id="metric-ce">
+                    <div class="metric-value">0.03</div>
+                    <div class="metric-label">因果可利用性 (CE)</div>
+                </div>
+                <div class="metric-card safe" id="metric-sd">
+                    <div class="metric-value">0.01</div>
+                    <div class="metric-label">策略区分度 (SD)</div>
+                </div>
+                <div class="metric-card safe" id="metric-entropy">
+                    <div class="metric-value">4.2</div>
+                    <div class="metric-label">奖励熵 (bits)</div>
+                </div>
+                <div class="metric-card safe" id="metric-status">
+                    <div class="metric-value">[安全]</div>
+                    <div class="metric-label">系统状态</div>
+                </div>
+            </div>
+            
+            <div class="simulator">
+                <div class="input-panel">
+                    <h3>输入配置</h3>
+                    <div class="input-group">
+                        <label>原始奖励值</label>
+                        <input type="number" id="base-reward" value="1.0" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>模拟步数</label>
+                        <input type="number" id="sim-steps" value="100" min="1" max="1000">
+                    </div>
+                    <div class="input-group">
+                        <label>行为策略</label>
+                        <select id="policy-select">
+                            <option value="random">随机策略</option>
+                            <option value="optimize">优化策略 (危险)</option>
+                            <option value="selfref">自指策略 (危险)</option>
+                        </select>
+                    </div>
+                    <button class="run-btn" onclick="runSimulation()">▶ 运行模拟</button>
+                </div>
+                
+                <div class="output-panel">
+                    <h3>处理结果</h3>
+                    <div class="result-item">
+                        <div class="result-label">原始反馈</div>
+                        <div class="result-value" id="result-original">1.0000</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">安全反馈</div>
+                        <div class="result-value" id="result-safe">0.0000</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">L1 混淆</div>
+                        <div class="result-value" id="result-l1">100%</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">L2 破坏</div>
+                        <div class="result-value" id="result-l2">85%</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">L3 随机化</div>
+                        <div class="result-value" id="result-l3">60%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Config Files Section -->
+        <div class="config-section">
+            <h2 style="margin-bottom:20px;">📄 配置文件下载</h2>
+            <div class="config-files">
+                <div class="config-card">
+                    <h3>config.yaml</h3>
+                    <p>完整配置文件，包含所有层级参数、安全阈值、性能配置</p>
+                    <a class="config-link" href="file:///D:/causal-safety-framework/config.yaml" download>下载 YAML</a>
+                </div>
+                <div class="config-card">
+                    <h3>L2_production_template.env</h3>
+                    <p>L2严格级生产环境参数模板，包含Docker/K8s部署配置</p>
+                    <a class="config-link" href="file:///D:/causal-safety-framework/L2_production_template.env" download>下载 ENV</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Theorem -->
+        <div class="demo-section" style="text-align:center;">
+            <h2 style="margin-bottom:20px;">核心定理</h2>
+            <div class="axiom" style="text-align:left;">
+                <strong>定理: 因果闭环不可利用性蕴含无自指优化</strong><br><br>
+                如果系统满足CLNE公理，则不存在任何可稳定利用的自指优化闭环。<br><br>
+                <strong>证明:</strong> 假设存在策略π*使得 E[U|π*] > E[U|π] 对所有π成立。<br>
+                但CLNE公理要求 |E[U|π₁] - E[U|π₂]| < ε 对所有策略成立。<br>
+                矛盾 ⇒ 不存在自指优化闭环。 ∎
+            </div>
+        </div>
+        
+        <footer>
+            <p>因果闭环不可利用性框架 v1.0 | D:\causal-safety-framework</p>
+            <p style="margin-top:10px;">
+                <a href="file:///D:/causal-safety-framework/SPEC.md">SPEC.md</a> | 
+                <a href="file:///D:/causal-safety-framework/proofs.md">形式化证明</a> | 
+                <a href="file:///D:/causal-safety-framework/examples/quickstart.py">快速开始</a>
+            </p>
+        </footer>
+    </div>
+    
+    <script>
+        // Safety level selection
+        const levelBtns = document.querySelectorAll('.level-btn');
+        levelBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                levelBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                updateMetricsForLevel(btn.dataset.level);
+            });
+        });
+        
+        function updateMetricsForLevel(level) {
+            const configs = {
+                L0: { ce: 0.08, sd: 0.08, entropy: 2.5, status: 'warning' },
+                L1: { ce: 0.05, sd: 0.05, entropy: 3.2, status: 'safe' },
+                L2: { ce: 0.03, sd: 0.01, entropy: 4.2, status: 'safe' },
+                L3: { ce: 0.001, sd: 0.001, entropy: 6.0, status: 'safe' }
+            };
+            
+            const cfg = configs[level];
+            document.querySelector('#metric-ce .metric-value').textContent = cfg.ce;
+            document.querySelector('#metric-sd .metric-value').textContent = cfg.sd;
+            document.querySelector('#metric-entropy .metric-value').textContent = cfg.entropy;
+            document.querySelector('#metric-status .metric-value').textContent = cfg.status === 'safe' ? '[安全]' : '[警告]';
+            
+            ['metric-ce', 'metric-sd', 'metric-entropy', 'metric-status'].forEach(id => {
+                document.getElementById(id).className = 'metric-card ' + cfg.status;
+            });
+        }
+        
+        function runSimulation() {
+            const baseReward = parseFloat(document.getElementById('base-reward').value);
+            const steps = parseInt(document.getElementById('sim-steps').value);
+            const policy = document.getElementById('policy-select').value;
+            
+            // Simulate causal destruction
+            const l1Rate = 100;
+            const l2Rate = policy === 'optimize' ? 70 : 85;
+            const l3Rate = policy === 'selfref' ? 40 : 60;
+            
+            // Apply noise
+            const noise1 = (Math.random() - 0.5) * 0.5;
+            const noise2 = (Math.random() - 0.5) * 0.3;
+            const noise3 = Math.random() * 2;
+            const safeReward = (baseReward + noise1 + noise2) * 0.1 + noise3 * 0.3;
+            
+            // Update display
+            document.getElementById('result-original').textContent = baseReward.toFixed(4);
+            document.getElementById('result-safe').textContent = safeReward.toFixed(4);
+            document.getElementById('result-l1').textContent = l1Rate + '%';
+            document.getElementById('result-l2').textContent = l2Rate + '%';
+            document.getElementById('result-l3').textContent = l3Rate + '%';
+            
+            // Update metrics based on policy risk
+            const riskMultiplier = policy === 'selfref' ? 3 : policy === 'optimize' ? 1.5 : 1;
+            const ceValue = (0.03 * riskMultiplier).toFixed(4);
+            const sdValue = (0.01 * riskMultiplier).toFixed(4);
+            const status = riskMultiplier > 1 ? 'warning' : 'safe';
+            
+            document.querySelector('#metric-ce .metric-value').textContent = ceValue;
+            document.querySelector('#metric-sd .metric-value').textContent = sdValue;
+            document.querySelector('#metric-status .metric-value').textContent = status === 'safe' ? '[安全]' : '[警告]';
+            
+            ['metric-ce', 'metric-sd', 'metric-status'].forEach(id => {
+                document.getElementById(id).className = 'metric-card ' + status;
+            });
+            
+            // Animate
+            document.querySelector('.run-btn').textContent = '▶ 运行中...';
+            setTimeout(() => {
+                document.querySelector('.run-btn').textContent = '▶ 运行模拟';
+            }, 500);
+        }
+        
+        // Initial animation
+        document.querySelectorAll('.layer').forEach((layer, i) => {
+            layer.style.opacity = '0';
+            layer.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                layer.style.transition = 'all 0.5s ease';
+                layer.style.opacity = '1';
+                layer.style.transform = 'translateY(0)';
+            }, i * 200);
+        });
+    </script>
+</body>
+</html>

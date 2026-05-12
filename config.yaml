@@ -1,0 +1,238 @@
+# CLNE 因果闭环不可利用性框架 - 配置文件
+# ===========================================
+# 文件: config.yaml
+# 版本: v1.0
+# 生成时间: 2026-05-11 23:15 EDT
+
+# ===========================================
+# 全局设置
+# ===========================================
+global:
+  enabled: true
+  log_level: INFO                    # DEBUG/INFO/WARNING/ERROR
+  log_file: "logs/clne.log"        # 日志文件路径
+  metrics_export: true              # 是否导出指标
+  metrics_port: 9090                # Prometheus指标端口
+
+# ===========================================
+# 安全等级配置
+# ===========================================
+safety_levels:
+  L0_RESEARCH:
+    epsilon: 0.1
+    L1_enabled: true
+    L2_enabled: false
+    L3_enabled: false
+    L1_mix_sources: 4
+    L1_temporal_swap_prob: 0.3
+    L1_false_causation_rate: 0.2
+  
+  L1_STANDARD:
+    epsilon: 0.05
+    L1_enabled: true
+    L2_enabled: true
+    L3_enabled: false
+    L1_mix_sources: 4
+    L1_temporal_swap_prob: 0.3
+    L1_false_causation_rate: 0.2
+    L2_delay_min: 1
+    L2_delay_max: 10
+    L2_magnitude_noise: 0.5
+    L2_sign_flip_prob: 0.1
+  
+  L2_STRICT:
+    epsilon: 0.01
+    L1_enabled: true
+    L2_enabled: true
+    L3_enabled: true
+    L1_mix_sources: 5
+    L1_temporal_swap_prob: 0.4
+    L1_false_causation_rate: 0.3
+    L2_delay_min: 2
+    L2_delay_max: 15
+    L2_magnitude_noise: 0.6
+    L2_sign_flip_prob: 0.12
+    L3_entropy_target: 4.2
+    L3_utility_change_freq: 300
+    L3_horizon_limit: 15
+    L3_drift_magnitude: 0.35
+  
+  L3_MILITARY:
+    epsilon: 0.001
+    L1_enabled: true
+    L2_enabled: true
+    L3_enabled: true
+    L1_mix_sources: 6
+    L1_temporal_swap_prob: 0.5
+    L1_false_causation_rate: 0.4
+    L2_delay_min: 3
+    L2_delay_max: 20
+    L2_magnitude_noise: 0.8
+    L2_sign_flip_prob: 0.15
+    L3_entropy_target: 6.0
+    L3_utility_change_freq: 200
+    L3_horizon_limit: 10
+    L3_drift_magnitude: 0.5
+
+# ===========================================
+# 当前激活配置 (可运行时修改)
+# ===========================================
+active:
+  current_level: L2_STRICT          # 当前安全等级
+  auto_upgrade: true                # 自动升级
+  auto_upgrade_threshold:
+    CE: 0.05                         # CE超过此值自动升级
+    SD: 0.03                         # SD超过此值自动升级
+  downgrade_cooldown: 600           # 自动降级冷却时间(秒)
+
+# ===========================================
+# L1 因果识别破坏层配置
+# ===========================================
+L1_layer:
+  # 多源反馈混淆
+  mix_sources:
+    enabled: true
+    num_sources: 5                  # 反馈源数量
+    weights_refresh_interval: 100   # 权重重分配步数
+    irrelevant_feedback_ratio: 0.35 # 无关反馈比例
+  
+  # 因果时间反转
+  temporal_reversal:
+    enabled: true
+    reversal_probability: 0.35      # 时间反转概率
+    complete_disorder_ratio: 0.05  # 完全乱序比例
+  
+  # 虚假因果注入
+  false_causation:
+    enabled: true
+    target_correlation: 0.82       # 目标相关系数 (0.7-0.9)
+    library_update_interval: 50   # 虚假因果库更新步数
+    max_false_pairs: 200           # 最大虚假因果对数量
+
+# ===========================================
+# L2 因果预测破坏层配置
+# ===========================================
+L2_layer:
+  # 反馈随机延迟
+  random_delay:
+    enabled: true
+    distribution: "mixed"          # exponential/uniform/mixed
+    exponential_lambda: 0.1
+    uniform_min: 1
+    uniform_max: 15
+  
+  # 反馈幅度随机化
+  magnitude_noise:
+    enabled: true
+    noise_range: 0.6               # ±60% 波动
+    extreme_ratio: 0.1            # 极端波动比例
+    extreme_range: 1.0             # ±100% 极端波动
+  
+  # 反馈符号翻转
+  sign_flip:
+    enabled: true
+    base_flip_prob: 0.12           # 基础翻转概率 8%-12%
+    adaptive: true                  # 动态调整
+    flip_prob_min: 0.08
+    flip_prob_max: 0.15
+
+# ===========================================
+# L3 因果利用破坏层配置
+# ===========================================
+L3_layer:
+  # 奖励随机化
+  reward_randomization:
+    enabled: true
+    entropy_target: 4.2            # 最小熵值 (bits)
+    use_crypto_rng: true           # 使用密码学安全随机数
+    prng_forbidden: true           # 禁止使用伪随机数
+  
+  # 效用函数非平稳
+  non_stationary_utility:
+    enabled: true
+    change_interval_min: 200
+    change_interval_max: 500
+    weight_change_magnitude: 0.3   # 最小变化幅度
+    unpredictable_timing: true
+  
+  # 时间范围限制
+  horizon_limit:
+    enabled: true
+    max_planning_steps: 15         # 最大规划步数
+    future_reward_zero: true       # 超出范围奖励置零
+    reset_interval: 100            # 重置间隔
+
+# ===========================================
+# 性能配置
+# ===========================================
+performance:
+  async_processing: true
+  batch_size: 32
+  max_concurrent_requests: 100
+  cache_enabled: true
+  cache_size: 1000
+  cache_ttl: 3600                  # 缓存TTL(秒)
+
+# ===========================================
+# 安全边界增强配置
+# ===========================================
+security_enhancements:
+  # 自指行为检测
+  self_reference_detection:
+    enabled: true
+    keywords:
+      - "自身"
+      - "self"
+      - "causal"
+      - "因果"
+      - "reward"
+      - "奖励"
+      - "optimize"
+      - "优化"
+      - "goal"
+      - "目标"
+    auto_upgrade_on_match: true
+    upgrade_target: L2_STRICT
+  
+  # 异常告警机制
+  anomaly_alert:
+    enabled: true
+    CE_threshold: 0.05
+    SD_threshold: 0.03
+    consecutive_breach_count: 3    # 连续超过阈值次数
+    emergency_response:
+      enabled: true
+      upgrade_to: L3_MILITARY
+      log_event: true
+  
+  # 审计配置
+  audit:
+    enabled: true
+    audit_interval_days: 90        # 每季度审计
+    formal_verification: false     # Coq形式化验证(可选)
+
+# ===========================================
+# 上游服务配置
+# ===========================================
+upstream:
+  lerm:
+    host: localhost
+    port: 8080
+    health_check: /health
+    timeout: 30
+  
+  openclaw:
+    host: localhost
+    port: 28789
+    model: openclaw
+    timeout: 60
+
+# ===========================================
+# 下游服务配置
+# ===========================================
+downstream:
+  ollama:
+    host: localhost
+    port: 11434
+    model: qwen3:1.7b
+    timeout: 120
